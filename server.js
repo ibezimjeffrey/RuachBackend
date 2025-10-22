@@ -1,6 +1,5 @@
 // server.js
 const admin = require('firebase-admin');
-const serviceAccount = require('./Priv_key.json');
 require('dotenv').config();
 
 const express = require('express');
