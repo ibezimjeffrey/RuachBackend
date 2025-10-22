@@ -13,7 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // ---------------- Firebase Setup ----------------
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(process.env.FIREBASE_SERVICE_ACCOUNT),
 });
 const db = admin.firestore();
 
