@@ -1,5 +1,6 @@
 // server.js
 const admin = require('firebase-admin');
+const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
 require('dotenv').config();
 
 const express = require('express');
@@ -12,7 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // ---------------- Firebase Setup ----------------
 admin.initializeApp({
-  credential: admin.credential.cert(process.env.FIREBASE_SERVICE_ACCOUNT),
+  credential: admin.credential.cert(serviceAccount),
 });
 const db = admin.firestore();
 
