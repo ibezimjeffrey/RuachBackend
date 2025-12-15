@@ -75,7 +75,7 @@ app.post('/withdraw', requireApiKey, async (req, res) => {
     }
 
     // deduct balance
-    await userRef.update({ Amount: user.Amount - (amount/100) });
+    await userRef.update({ Amount: user.Amount - (amount/10) });
 
     // create transaction
     const tx = {
