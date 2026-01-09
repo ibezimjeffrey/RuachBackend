@@ -1,10 +1,7 @@
 // server.js
-require('dotenv').config();          // 1️⃣ Load .env first
-
-const admin = require('firebase-admin');  
-
-const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);  // 2️⃣ Now it works
-serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+const admin = require('firebase-admin');
+const serviceAccount = require('./Priv_key.json');
+require('dotenv').config();
 
 const express = require('express');
 const axios = require('axios');
