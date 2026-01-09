@@ -1,7 +1,10 @@
 // server.js
-const admin = require('firebase-admin');
-const serviceAccount = require('./Priv_key.json');
-require('dotenv').config();
+require('dotenv').config();          // 1️⃣ Load .env first
+
+const admin = require('firebase-admin');  
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);  // 2️⃣ Now it works
+serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
 const express = require('express');
 const axios = require('axios');
@@ -13,7 +16,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // ---------------- Firebase Setup ----------------
 admin.initializeApp({
-  credential: admin.credential.cert(process.env.FIREBASE_SERVICE_ACCOUNT),
+  credential: admin.credential.cert(serviceAccount),
 });
 const db = admin.firestore();
 
@@ -75,7 +78,7 @@ app.post('/withdraw', requireApiKey, async (req, res) => {
     }
 
     // deduct balance
-    await userRef.update({ Amount: user.Amount - amount });
+    await userRef.update({ Amount: user.Amount - (amount/100) });
 
     // create transaction
     const tx = {
