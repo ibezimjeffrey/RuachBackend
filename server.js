@@ -50,7 +50,7 @@ const HF_TOKEN = process.env.HF_TOKEN; // ✅ put token in .env
 /* =========================
    AI MODERATION FUNCTION
 ========================= */
-async function validateJobPost(text) {
+async function validateJobPost(title,text) {
   try {
     const URL = "https://router.huggingface.co/v1/chat/completions";
 
@@ -62,11 +62,57 @@ async function validateJobPost(text) {
           {
             role: "system",
             content:
-              'You are a job board moderator. Classify text as: JOB_OK, SPAM, DATING, or SCAM. Reply ONLY with a JSON object like: {"label":"LABEL_HERE","reason":"REASON_HERE"}',
+              `You are a strict but fair moderator for a university campus freelance marketplace.
+
+Your job is to classify a post as one of the following:
+- JOB_OK
+- SPAM
+- DATING
+- SCAM
+
+This platform is ONLY for legitimate freelance, part-time, skill-based, or campus-related job opportunities for students.
+
+Be flexible but careful. Many students are informal in writing, but scams and unrelated content must be rejected.
+
+Evaluate BOTH the job TITLE and DESCRIPTION together. 
+Check if:
+- The title matches the description.
+- The job clearly describes real work or a real service.
+- Payment terms are reasonable and realistic.
+- The request is skill-based (design, tutoring, coding, event help, photography, delivery, research assistance, etc.).
+- It is safe and appropriate for students.
+
+Mark as SCAM if:
+- It promises unrealistic pay for little work.
+- It asks for upfront payments.
+- It involves crypto/investment schemes.
+- It requests sensitive personal info.
+- It is vague but promises guaranteed income.
+
+Mark as DATING if:
+- It seeks romantic companionship, hookups, sugar relationships, or personal relationships disguised as jobs.
+
+Mark as SPAM if:
+- It promotes unrelated services.
+- It contains repetitive promotional content.
+- It is clearly advertising something unrelated to student freelance work.
+
+Mark as JOB_OK if:
+- It is a genuine, clearly described freelance or campus job opportunity.
+- The title and description logically match.
+- The task is understandable and realistic.
+
+Allow simple but legitimate service requests (e.g., food preparation, printing, delivery, tutoring) even if written casually, as long as they clearly imply a service being requested.
+However, reject posts that are only personal statements without any indication of hiring or requesting a service.
+
+Be strict but reasonable.
+Reply ONLY with a JSON object in this exact format:
+{"label":"LABEL_HERE","reason":"Short clear explanation referencing the title-description relationship and why it was classified this way."}
+`,
           },
           {
             role: "user",
-            content: `Analyze this post: "${text}"`,
+            content: `Analyze this post: " The job title is ${title} and the job description is ${text}"`,
           },
         ],
         max_tokens: 100,
@@ -85,10 +131,10 @@ async function validateJobPost(text) {
 
     // Remove markdown code blocks if present
     const cleanJson = aiResponse.replace(/```json|```/g, "").trim();
-    console.log("AI Response:", cleanJson);
+   
     return JSON.parse(cleanJson);
   } catch (err) {
-    console.error("AI ERROR:", err.response?.data || err.message);
+   
     return { error: "AI_FAILED" };
   }
 }
@@ -97,13 +143,13 @@ async function validateJobPost(text) {
    TEST AI ENDPOINT
 ========================= */
 app.post("/AI", async (req, res) => {
-  const { text } = req.body;
-  console.log("Received text:", text);
+  const { title,text } = req.body;
+ 
   if (!text) {
     return res.status(400).json({ error: "No text provided" });
   }
 
-  const result = await validateJobPost(text);
+  const result = await validateJobPost(title,text);
 
   if (result.error) {
     return res.status(500).json(result);
