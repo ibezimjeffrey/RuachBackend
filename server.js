@@ -41,6 +41,80 @@ if (!PAYSTACK_SECRET_KEY || !FEE_ACCOUNT_RECIPIENT_CODE) {
    APP INIT
 ========================= */
 const app = express();
+app.use(express.json());
+/* =========================
+   HUGGINGFACE AI CONFIG
+========================= */
+const HF_TOKEN = process.env.HF_TOKEN; // ✅ put token in .env
+
+/* =========================
+   AI MODERATION FUNCTION
+========================= */
+async function validateJobPost(text) {
+  try {
+    const URL = "https://router.huggingface.co/v1/chat/completions";
+
+    const response = await axios.post(
+      URL,
+      {
+        model: "Qwen/Qwen2.5-72B-Instruct",
+        messages: [
+          {
+            role: "system",
+            content:
+              'You are a job board moderator. Classify text as: JOB_OK, SPAM, DATING, or SCAM. Reply ONLY with a JSON object like: {"label":"LABEL_HERE","reason":"REASON_HERE"}',
+          },
+          {
+            role: "user",
+            content: `Analyze this post: "${text}"`,
+          },
+        ],
+        max_tokens: 100,
+        temperature: 0.1,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    const aiResponse = response.data.choices[0].message.content;
+
+    // Remove markdown code blocks if present
+    const cleanJson = aiResponse.replace(/```json|```/g, "").trim();
+    console.log("AI Response:", cleanJson);
+    return JSON.parse(cleanJson);
+  } catch (err) {
+    console.error("AI ERROR:", err.response?.data || err.message);
+    return { error: "AI_FAILED" };
+  }
+}
+
+/* =========================
+   TEST AI ENDPOINT
+========================= */
+app.post("/AI", async (req, res) => {
+  const { text } = req.body;
+  console.log("Received text:", text);
+  if (!text) {
+    return res.status(400).json({ error: "No text provided" });
+  }
+
+  const result = await validateJobPost(text);
+
+  if (result.error) {
+    return res.status(500).json(result);
+  }
+
+  res.json({
+    allowed: result.label === "JOB_OK",
+    label: result.label,
+    reason: result.reason,
+  });
+});
 
 /* =========================
    PAYSTACK HELPER
@@ -104,7 +178,7 @@ app.post(
 /* =========================
    JSON MIDDLEWARE
 ========================= */
-app.use(express.json());
+
 
 /* =========================
    API KEY GUARD
