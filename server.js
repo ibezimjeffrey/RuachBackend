@@ -264,7 +264,7 @@ app.post("/withdraw", requireApiKey, async (req, res) => {
       source: "balance",
       amount,
       recipient: recipientRes.data.recipient_code,
-      reason: `Withdrawal for ${userId}`,
+      reason: `Withdrawal for ${name}`,
     });
 
     await db.collection("transactions").add({
@@ -330,6 +330,57 @@ app.post("/charges", requireApiKey, async (req, res) => {
     res.status(400).json({ error: err.message || "Payment failed" });
   }
 });
+/* =========================
+   ESCROW AUTO-RELEASE JOB
+========================= */
+const checkEscrows = async () => {
+  const now = new Date();
+  try {
+    const escrowsSnapshot = await db.collection('Escrows')
+      .where('status', '==', 'in_progress')
+      .where('isReleased', '==', false)
+      .get();
+
+    escrowsSnapshot.forEach(async (docSnap) => {
+      const escrow = docSnap.data();
+
+      // Check if autoReleaseAt has passed
+      if (escrow.autoReleaseAt <= now.getTime()) {
+        const freelancerRef = db.collection('Balance').doc(escrow.freelancerId);
+        const freelancerSnap = await freelancerRef.get();
+        const freelancerBalance = freelancerSnap.exists ? freelancerSnap.data().Amount : 0;
+
+        // Credit freelancer
+        await freelancerRef.set({
+          Amount: freelancerBalance + escrow.amount
+        });
+
+        // Mark escrow as released
+        await docSnap.ref.update({
+          status: 'released',
+          isReleased: true
+        });
+
+        // Add to transaction history
+        await db.collection('TransactionHistory').add({
+          userId: escrow.freelancerId,
+          type: 'credit',
+          amount: escrow.amount,
+          reason: `Auto-release for post ${escrow.postId}`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log(`✅ Auto-released escrow ${escrow._id}`);
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error checking escrows:", err);
+  }
+};
+
+// Run every 10 minutes
+setInterval(checkEscrows, 10 * 60 * 1000);
+
 
 /* =========================
    HEALTH CHECKS
