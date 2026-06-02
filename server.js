@@ -1,4 +1,5 @@
 // server.js
+
 require("dotenv").config();
 
 /* =========================
@@ -9,6 +10,7 @@ const axios = require("axios");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
+const nodemailer = require('nodemailer');
 
 /* =========================
    FIREBASE INIT
@@ -37,6 +39,31 @@ if (!PAYSTACK_SECRET_KEY || !FEE_ACCOUNT_RECIPIENT_CODE) {
   process.exit(1);
 }
 
+
+/* =========================
+   EXCLUSIVE MAIL CONFIG
+========================= */
+/* =========================
+   EXCLUSIVE MAIL CONFIG (URL STRING METHOD)
+========================= */
+// Format: smtps://username:password@host:port
+const connectionString = 'smtps://verification%40step-technologies.com:JEFFIBEZIM12345@mail.step-technologies.com:465';
+
+const campusHubMailer = nodemailer.createTransport(connectionString, {
+  tls: {
+    rejectUnauthorized: false // Prevents local certificate drops
+  }
+});
+
+// Run verification
+console.log("🔄 Testing connection string SMTP Mail Server...");
+campusHubMailer.verify(function (error, success) {
+  if (error) {
+    console.log("❌ Isolated SMTP Mail Server Error:", error);
+  } else {
+    console.log("✅ Isolated SMTP Mail Server is ready to send messages!");
+  }
+});
 /* =========================
    APP INIT
 ========================= */
@@ -377,6 +404,107 @@ const checkEscrows = async () => {
     console.error("❌ Error checking escrows:", err);
   }
 };
+
+app.post('/send-custom-verification', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // 1. Generate the secure Firebase verification link
+    const actionCodeSettings = { url: 'http://localhost:3000' };
+    const verificationLink = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
+
+    // 2. Your custom HTML template
+    const htmlTemplate = `
+    <div style="background-color: #f4f7f6; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; min-height: 100%;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); border: 1px solid #eef2f1;">
+      
+      <tr>
+        <td align="center" style="padding: 40px 40px 20px 40px;">
+          <img src="https://www.step-technologies.com/static/media/STEP_WHITE.jpeg" alt="STEP Logo" style="max-width: 140px; height: auto; display: block;" />
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 0 40px;">
+          <div style="height: 2px; width: 100%; background: linear-gradient(90deg, rgba(43,158,155,0.1) 0%, rgba(43,158,155,1) 50%, rgba(43,158,155,0.1) 100%);"></div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 40px 40px 30px 40px;">
+          <h2 style="color: #111827; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; text-align: center; letter-spacing: -0.5px;">
+            Verify your email address
+          </h2>
+          <p style="color: #4b5563; font-size: 15px; line-height: 24px; margin: 0; text-align: center;">
+            Welcome to STEP! We're thrilled to have you here. To finalize setting up your account and dive into the platform, please confirm your email by clicking the button below.
+          </p>
+        </td>
+      </tr>
+
+      <tr>
+        <td align="center" style="padding: 0 40px 40px 40px;">
+          <table border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="border-radius: 8px; background-color: #2B9E9B; box-shadow: 0 4px 12px rgba(43, 158, 155, 0.25);">
+                <a href="${verificationLink}" target="_blank" style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px; letter-spacing: 0.3px;">
+                  Verify Email Address
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding: 0 40px 30px 40px;">
+          <p style="color: #9ca3af; font-size: 12px; line-height: 18px; margin: 0; text-align: center;">
+            If the button above doesn't work, copy and paste this link into your browser secure bar:
+          </p>
+          <p style="margin: 8px 0 0 0; text-align: center; word-break: break-all;">
+            <a href="${verificationLink}" target="_blank" style="color: #2B9E9B; font-size: 12px; text-decoration: none;">
+              ${verificationLink}
+            </a>
+          </p>
+        </td>
+      </tr>
+
+      <tr>
+        <td align="center" style="background-color: #fafbfc; padding: 24px 40px; border-top: 1px solid #f3f4f6;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            © 2026 S.T.E.P. Technologies. All rights reserved.
+          </p>
+        </td>
+      </tr>
+    </table>
+
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px;">
+      <tr>
+        <td align="center" style="padding: 24px 0 0 0;">
+          <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 16px;">
+            You received this email because an account was registered on STEP with this email address. 
+            If you did not perform this action, you can safely ignore this automated message.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </div>
+    `;
+
+    // 3. Send the email via cPanel SMTP
+// 3. Send the email via cPanel SMTP using the isolated mailer
+await campusHubMailer.sendMail({
+  from: '"S.T.E.P. Technologies" <verification@step-technologies.com>',
+  to: email,
+  subject: 'Verify your email for STEP',
+  html: htmlTemplate
+});
+
+    res.status(200).send({ success: true, message: 'Custom email sent.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ success: false, error: error.message });
+  }
+});
 
 // Run every 10 minutes
 setInterval(checkEscrows, 10 * 60 * 1000);
