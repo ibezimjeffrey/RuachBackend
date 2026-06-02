@@ -410,7 +410,10 @@ app.post('/send-custom-verification', async (req, res) => {
 
   try {
     // 1. Generate the secure Firebase verification link
-    const actionCodeSettings = { url: 'http://localhost:3000' };
+   const actionCodeSettings = { 
+  url: 'https://www.step-technologies.com', 
+  handleCodeInApp: false 
+};
     const verificationLink = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
 
     // 2. Your custom HTML template
