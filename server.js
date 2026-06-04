@@ -12,6 +12,42 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const nodemailer = require('nodemailer');
 
+
+const net = require('net');
+
+function testMailPort(port) {
+  console.log(`🔍 Scanning outbound connection to mail.step-technologies.com on Port ${port}...`);
+  
+  const socket = new net.Socket();
+  
+  // Set a short 4-second timeout for the scan
+  socket.setTimeout(4000);
+
+  socket.connect(port, 'mail.step-technologies.com', () => {
+    console.log(`✅ PORT ${port} IS ALLOWED on Render!`);
+    socket.destroy(); // Clean up connection
+  });
+
+  socket.on('timeout', () => {
+    console.log(`❌ PORT ${port} TIMED OUT (Blocked by Render firewall).`);
+    socket.destroy();
+  });
+
+  socket.on('error', (err) => {
+    console.log(`❌ PORT ${port} FAILED: ${err.message}`);
+  });
+}
+
+// Scan all potential cPanel email ports on startup
+setTimeout(() => {
+  console.log("=== STARTING RENDER NETWORK PORT SCAN ===");
+  testMailPort(465);  // Secure SSL
+  testMailPort(587);  // STARTTLS
+  testMailPort(25);   // Default SMTP
+  testMailPort(2525); // Common alternative bypass port
+}, 3000);
+
+
 /* =========================
    FIREBASE INIT
 ========================= */
