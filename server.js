@@ -540,9 +540,9 @@ app.post('/send-custom-verification', async (req, res) => {
 
     // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
     const response = await resend.emails.send({
-      from: 'STEP Verification <verification@step-technologies.com>',
+      from: 'STEP <verification@step-technologies.com>',
       to: [email],
-      subject: 'Verify your email for CampusHub',
+      subject: 'Verify your email for STEP',
       html: htmlTemplate
     });
 
