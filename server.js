@@ -11,7 +11,7 @@ const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const nodemailer = require('nodemailer');
-
+const { Resend } = require('resend');
 
 const net = require('net');
 
@@ -441,20 +441,29 @@ const checkEscrows = async () => {
   }
 };
 
-app.post('/send-custom-verification', async (req, res) => {
-  const { email } = req.body;
+const resend = new Resend('re_TLrYDpqb_42HmCJc45XMkPKbjX1woLmqW');
 
-  try {
-    // 1. Generate the secure Firebase verification link
-   const actionCodeSettings = { 
+
+
+const actionCodeSettings = { 
   url: 'https://www.step-technologies.com', 
   handleCodeInApp: false 
 };
+
+app.post('/send-custom-verification', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email payload is missing" });
+  }
+
+  try {
+    // 1. Request the verification link from Firebase Admin securely
     const verificationLink = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
 
-    // 2. Your custom HTML template
+    // 2. Your breathtaking Teal Aesthetic HTML Layout
     const htmlTemplate = `
-    <div style="background-color: #f4f7f6; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; min-height: 100%;">
+     <div style="background-color: #f4f7f6; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; min-height: 100%;">
     <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); border: 1px solid #eef2f1;">
       
       <tr>
@@ -529,21 +538,39 @@ app.post('/send-custom-verification', async (req, res) => {
   </div>
     `;
 
-    // 3. Send the email via cPanel SMTP
-// 3. Send the email via cPanel SMTP using the isolated mailer
-await campusHubMailer.sendMail({
-  from: '"S.T.E.P. Technologies" <verification@step-technologies.com>',
-  to: email,
-  subject: 'Verify your email for STEP',
-  html: htmlTemplate
-});
+    // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
+    const response = await resend.emails.send({
+      from: 'STEP Verification <verification@step-technologies.com>',
+      to: [email],
+      subject: 'Verify your email for CampusHub',
+      html: htmlTemplate
+    });
 
-    res.status(200).send({ success: true, message: 'Custom email sent.' });
+    if (response.error) {
+      console.error("❌ Resend Delivery Error:", response.error);
+      return res.status(400).json({ error: response.error.message });
+    }
+
+    console.log("🚀 Verification Email Sent to", email);
+    return res.status(200).json({ message: "Verification link sent successfully!" });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).send({ success: false, error: error.message });
+    console.error("❌ Firebase Link Generation Fail:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Run every 10 minutes
 setInterval(checkEscrows, 10 * 60 * 1000);
