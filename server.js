@@ -10,30 +10,32 @@ const axios = require("axios");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
-const nodemailer = require('nodemailer');
-const { Resend } = require('resend');
+const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const net = require('net');
+const net = require("net");
 
 function testMailPort(port) {
-  console.log(`🔍 Scanning outbound connection to mail.step-technologies.com on Port ${port}...`);
-  
+  console.log(
+    `🔍 Scanning outbound connection to mail.step-technologies.com on Port ${port}...`,
+  );
+
   const socket = new net.Socket();
-  
+
   // Set a short 4-second timeout for the scan
   socket.setTimeout(4000);
 
-  socket.connect(port, 'mail.step-technologies.com', () => {
+  socket.connect(port, "mail.step-technologies.com", () => {
     console.log(`✅ PORT ${port} IS ALLOWED on Render!`);
     socket.destroy(); // Clean up connection
   });
 
-  socket.on('timeout', () => {
+  socket.on("timeout", () => {
     console.log(`❌ PORT ${port} TIMED OUT (Blocked by Render firewall).`);
     socket.destroy();
   });
 
-  socket.on('error', (err) => {
+  socket.on("error", (err) => {
     console.log(`❌ PORT ${port} FAILED: ${err.message}`);
   });
 }
@@ -41,12 +43,11 @@ function testMailPort(port) {
 // Scan all potential cPanel email ports on startup
 setTimeout(() => {
   console.log("=== STARTING RENDER NETWORK PORT SCAN ===");
-  testMailPort(465);  // Secure SSL
-  testMailPort(587);  // STARTTLS
-  testMailPort(25);   // Default SMTP
+  testMailPort(465); // Secure SSL
+  testMailPort(587); // STARTTLS
+  testMailPort(25); // Default SMTP
   testMailPort(2525); // Common alternative bypass port
 }, 3000);
-
 
 /* =========================
    FIREBASE INIT
@@ -75,7 +76,6 @@ if (!PAYSTACK_SECRET_KEY || !FEE_ACCOUNT_RECIPIENT_CODE) {
   process.exit(1);
 }
 
-
 /* =========================
    EXCLUSIVE MAIL CONFIG
 ========================= */
@@ -83,12 +83,13 @@ if (!PAYSTACK_SECRET_KEY || !FEE_ACCOUNT_RECIPIENT_CODE) {
    EXCLUSIVE MAIL CONFIG (URL STRING METHOD)
 ========================= */
 // Format: smtps://username:password@host:port
-const connectionString = 'smtps://verification%40step-technologies.com:JEFFIBEZIM12345@mail.step-technologies.com:465';
+const connectionString =
+  "smtps://verification%40step-technologies.com:JEFFIBEZIM12345@mail.step-technologies.com:465";
 
 const campusHubMailer = nodemailer.createTransport(connectionString, {
   tls: {
-    rejectUnauthorized: false // Prevents local certificate drops
-  }
+    rejectUnauthorized: false, // Prevents local certificate drops
+  },
 });
 
 // Run verification
@@ -113,7 +114,7 @@ const HF_TOKEN = process.env.HF_TOKEN; // ✅ put token in .env
 /* =========================
    AI MODERATION FUNCTION
 ========================= */
-async function validateJobPost(title,text) {
+async function validateJobPost(title, text) {
   try {
     const URL = "https://router.huggingface.co/v1/chat/completions";
 
@@ -124,8 +125,7 @@ async function validateJobPost(title,text) {
         messages: [
           {
             role: "system",
-            content:
-              `You are a strict but fair moderator for a university campus freelance marketplace.
+            content: `You are a strict but fair moderator for a university campus freelance marketplace.
 
 Your job is to classify a post as one of the following:
 - JOB_OK
@@ -187,17 +187,16 @@ Reply ONLY with a JSON object in this exact format:
           "Content-Type": "application/json",
         },
         timeout: 15000,
-      }
+      },
     );
 
     const aiResponse = response.data.choices[0].message.content;
 
     // Remove markdown code blocks if present
     const cleanJson = aiResponse.replace(/```json|```/g, "").trim();
-   
+
     return JSON.parse(cleanJson);
   } catch (err) {
-   
     return { error: "AI_FAILED" };
   }
 }
@@ -206,13 +205,13 @@ Reply ONLY with a JSON object in this exact format:
    TEST AI ENDPOINT
 ========================= */
 app.post("/AI", async (req, res) => {
-  const { title,text } = req.body;
- 
+  const { title, text } = req.body;
+
   if (!text) {
     return res.status(400).json({ error: "No text provided" });
   }
 
-  const result = await validateJobPost(title,text);
+  const result = await validateJobPost(title, text);
 
   if (result.error) {
     return res.status(500).json(result);
@@ -287,7 +286,6 @@ app.post(
 /* =========================
    JSON MIDDLEWARE
 ========================= */
-
 
 /* =========================
    API KEY GUARD
@@ -399,9 +397,10 @@ app.post("/charges", requireApiKey, async (req, res) => {
 const checkEscrows = async () => {
   const now = new Date();
   try {
-    const escrowsSnapshot = await db.collection('Escrows')
-      .where('status', '==', 'in_progress')
-      .where('isReleased', '==', false)
+    const escrowsSnapshot = await db
+      .collection("Escrows")
+      .where("status", "==", "in_progress")
+      .where("isReleased", "==", false)
       .get();
 
     escrowsSnapshot.forEach(async (docSnap) => {
@@ -409,28 +408,30 @@ const checkEscrows = async () => {
 
       // Check if autoReleaseAt has passed
       if (escrow.autoReleaseAt <= now.getTime()) {
-        const freelancerRef = db.collection('Balance').doc(escrow.freelancerId);
+        const freelancerRef = db.collection("Balance").doc(escrow.freelancerId);
         const freelancerSnap = await freelancerRef.get();
-        const freelancerBalance = freelancerSnap.exists ? freelancerSnap.data().Amount : 0;
+        const freelancerBalance = freelancerSnap.exists
+          ? freelancerSnap.data().Amount
+          : 0;
 
         // Credit freelancer
         await freelancerRef.set({
-          Amount: freelancerBalance + escrow.amount
+          Amount: freelancerBalance + escrow.amount,
         });
 
         // Mark escrow as released
         await docSnap.ref.update({
-          status: 'released',
-          isReleased: true
+          status: "released",
+          isReleased: true,
         });
 
         // Add to transaction history
-        await db.collection('TransactionHistory').add({
+        await db.collection("TransactionHistory").add({
           userId: escrow.freelancerId,
-          type: 'credit',
+          type: "credit",
           amount: escrow.amount,
           reason: `Auto-release for post ${escrow.postId}`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
         console.log(`✅ Auto-released escrow ${escrow._id}`);
@@ -441,16 +442,14 @@ const checkEscrows = async () => {
   }
 };
 
-const resend = new Resend('re_TLrYDpqb_42HmCJc45XMkPKbjX1woLmqW');
+const resend = new Resend("re_TLrYDpqb_42HmCJc45XMkPKbjX1woLmqW");
 
-
-
-const actionCodeSettings = { 
-  url: 'https://www.step-technologies.com', 
-  handleCodeInApp: false 
+const actionCodeSettings = {
+  url: "https://www.step-technologies.com",
+  handleCodeInApp: false,
 };
 
-app.post('/send-custom-verification', async (req, res) => {
+app.post("/send-custom-verification", async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
@@ -459,7 +458,9 @@ app.post('/send-custom-verification', async (req, res) => {
 
   try {
     // 1. Request the verification link from Firebase Admin securely
-    const verificationLink = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
+    const verificationLink = await admin
+      .auth()
+      .generateEmailVerificationLink(email, actionCodeSettings);
 
     // 2. Your breathtaking Teal Aesthetic HTML Layout
     const htmlTemplate = `
@@ -540,10 +541,10 @@ app.post('/send-custom-verification', async (req, res) => {
 
     // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
     const response = await resend.emails.send({
-      from: 'STEP <verification@step-technologies.com>',
+      from: "STEP <verification@step-technologies.com>",
       to: [email],
-      subject: 'Verify your email for STEP',
-      html: htmlTemplate
+      subject: "Verify your email for STEP",
+      html: htmlTemplate,
     });
 
     if (response.error) {
@@ -552,29 +553,17 @@ app.post('/send-custom-verification', async (req, res) => {
     }
 
     console.log("🚀 Verification Email Sent to", email);
-    return res.status(200).json({ message: "Verification link sent successfully!" });
-
+    return res
+      .status(200)
+      .json({ message: "Verification link sent successfully!" });
   } catch (error) {
     console.error("❌ Firebase Link Generation Fail:", error);
     return res.status(500).json({ error: error.message });
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
 // Run every 10 minutes
 setInterval(checkEscrows, 10 * 60 * 1000);
-
 
 /* =========================
    HEALTH CHECKS

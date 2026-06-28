@@ -11,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "appdynamics": "^26.4.1",
     "axios": "^1.12.2",
     "body-parser": "^2.2.0",
     "dotenv": "^17.2.3",
