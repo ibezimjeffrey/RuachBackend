@@ -15,6 +15,7 @@
     "axios": "^1.12.2",
     "body-parser": "^2.2.0",
     "dotenv": "^17.2.3",
+    "expo-server-sdk": "^6.1.0",
     "express": "^5.1.0",
     "firebase-admin": "^13.10.0",
     "nodemailer": "^8.0.10",

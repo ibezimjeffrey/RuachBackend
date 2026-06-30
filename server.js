@@ -12,6 +12,9 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
+const { Expo } = require("expo-server-sdk");
+
+const expo = new Expo();
 
 const net = require("net");
 
@@ -448,6 +451,43 @@ const actionCodeSettings = {
   url: "https://www.step-technologies.com",
   handleCodeInApp: false,
 };
+
+
+app.post("/send-notification", async (req, res) => {
+
+const usersSnapshot = await db.collection("users").get();
+
+const tokens = [];
+
+usersSnapshot.forEach((doc) => {
+  const token = doc.data().expoPushToken;
+
+  if (token) {
+    tokens.push(token);
+  }
+});
+
+const messages = tokens.map((token) => ({
+  to: token,
+  sound: "default",
+  title: req.body.title,
+  body: req.body.body,
+  data: {
+    jobId: req.body.jobId,
+  },
+}));
+
+
+let chunks = expo.chunkPushNotifications(messages);
+
+for (let chunk of chunks) {
+    await expo.sendPushNotificationsAsync(chunk);
+}
+
+})
+
+
+
 
 app.post("/send-custom-verification", async (req, res) => {
   const { email } = req.body;
