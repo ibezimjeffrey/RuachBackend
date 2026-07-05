@@ -489,6 +489,46 @@ for (let chunk of chunks) {
 
 
 
+
+app.post("/send-message-notification", async (req, res) => {
+
+const userDoc = await db
+  .collection("users")
+  .doc(req.body.receiverId)
+  .get();
+
+const token = userDoc.data().expoPushToken;
+
+
+const messages = [
+  {
+    to: token,
+    sound: "default",
+    title: req.body.senderName,
+    body: req.body.message,
+    data: {
+      roomId: req.body.roomId,
+    },
+  },
+];
+
+let chunks = expo.chunkPushNotifications(messages);
+
+for (let chunk of chunks) {
+    await expo.sendPushNotificationsAsync(chunk);
+}
+
+
+
+
+});
+
+
+
+
+
+
+
 app.post("/send-custom-verification", async (req, res) => {
   const { email } = req.body;
 
