@@ -507,7 +507,7 @@ const messages = [
     title: req.body.senderName,
     body: req.body.message,
     data: {
-      post: req.body.post,
+      roomId: req.body.roomId,
     },
   },
 ];
