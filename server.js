@@ -190,7 +190,7 @@ Reply ONLY with a JSON object in this exact format:
           "Content-Type": "application/json",
         },
         timeout: 15000,
-      },
+      }
     );
 
     const aiResponse = response.data.choices[0].message.content;
@@ -473,6 +473,7 @@ const messages = tokens.map((token) => ({
   title: req.body.title,
   body: req.body.body,
   data: {
+    "type": "job",
     jobId: req.body.jobId,
   },
 }));
@@ -484,6 +485,10 @@ for (let chunk of chunks) {
     await expo.sendPushNotificationsAsync(chunk);
 }
 
+ return res.status(200).json({
+      success: true,
+      message: "Notification sent successfully",
+    });
 })
 
 
@@ -507,6 +512,7 @@ const messages = [
     title: req.body.senderName,
     body: req.body.message,
     data: {
+      "type": "chat",
       roomId: req.body.roomId,
     },
   },
@@ -518,10 +524,99 @@ for (let chunk of chunks) {
     await expo.sendPushNotificationsAsync(chunk);
 }
 
+ return res.status(200).json({
+      success: true,
+      message: "Notification sent successfully",
+    });
 
 
 
 });
+
+
+
+
+
+
+
+
+
+  app.post("/send-hired-notification", async (req, res) => {
+
+  const userDoc = await db
+    .collection("users")
+    .doc(req.body.receiverId)
+    .get();
+
+  const token = userDoc.data().expoPushToken;
+
+
+  const messages = [
+    {
+      to: token,
+      sound: "default",
+      title: req.body.title,
+      body: req.body.body,
+      data: {
+        "type": "hired",
+        roomId: req.body.roomId,
+      },
+    },
+  ];
+
+  let chunks = expo.chunkPushNotifications(messages);
+
+  for (let chunk of chunks) {
+      await expo.sendPushNotificationsAsync(chunk);
+  }
+
+ return res.status(200).json({
+      success: true,
+      message: "Notification sent successfully",
+    });
+
+  });
+
+
+
+
+ app.post("/send-paid-notification", async (req, res) => {
+
+  const userDoc = await db
+    .collection("users")
+    .doc(req.body.receiverId)
+    .get();
+
+  const token = userDoc.data().expoPushToken;
+
+
+  const messages = [
+    {
+      to: token,
+      sound: "default",
+      title: req.body.title,
+      body: req.body.body,
+      data: {
+        "type": "paid",
+        roomId: req.body.roomId,
+      },
+    },
+  ];
+
+  let chunks = expo.chunkPushNotifications(messages);
+
+  for (let chunk of chunks) {
+      await expo.sendPushNotificationsAsync(chunk);
+  }
+
+ return res.status(200).json({
+      success: true,
+      message: "Notification sent successfully",
+    });
+
+  });
+
+
 
 
 
