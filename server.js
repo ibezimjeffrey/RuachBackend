@@ -13,6 +13,7 @@ const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
 const { Expo } = require("expo-server-sdk");
+const { GoogleGenAI } = require("@google/genai");
 
 const expo = new Expo();
 
@@ -63,6 +64,10 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 /* =========================
    CONFIG
@@ -119,16 +124,9 @@ const HF_TOKEN = process.env.HF_TOKEN; // ✅ put token in .env
 ========================= */
 async function validateJobPost(title, text) {
   try {
-    const URL = "https://router.huggingface.co/v1/chat/completions";
 
-    const response = await axios.post(
-      URL,
-      {
-        model: "Qwen/Qwen2.5-72B-Instruct",
-        messages: [
-          {
-            role: "system",
-            content: `You are a strict but fair moderator for a university campus freelance marketplace.
+    const SYSTEM_PROMPT = `
+You are a strict but fair moderator for a university campus freelance marketplace.
 
 Your job is to classify a post as one of the following:
 - JOB_OK
@@ -138,70 +136,93 @@ Your job is to classify a post as one of the following:
 
 This platform is ONLY for legitimate freelance, part-time, skill-based, or campus-related job opportunities for students.
 
-Be flexible but careful. Many students are informal in writing, but scams and unrelated content must be rejected.
+Evaluate BOTH the title and description together.
 
-Evaluate BOTH the job TITLE and DESCRIPTION together. 
-Check if:
-- The title matches the description.
-- The job clearly describes real work or a real service.
-- Payment terms are reasonable and realistic.
-- The request is skill-based (design, tutoring, coding, event help, photography, delivery, research assistance, etc.).
-- It is safe and appropriate for students.
+Rules:
 
-Mark as SCAM if:
-- It promises unrealistic pay for little work.
-- It asks for upfront payments.
-- It involves crypto/investment schemes.
-- It requests sensitive personal info.
-- It is vague but promises guaranteed income.
+JOB_OK
+- Genuine freelance or campus-related work.
+- Title matches description.
+- Realistic payment.
+- Clearly describes a service or task.
 
-Mark as DATING if:
-- It seeks romantic companionship, hookups, sugar relationships, or personal relationships disguised as jobs.
+SCAM
+- Unrealistic earnings.
+- Requests upfront payment.
+- Crypto/investment schemes.
+- Requests sensitive information.
+- Guaranteed income.
+- Extremely vague offers.
 
-Mark as SPAM if:
-- It promotes unrelated services.
-- It contains repetitive promotional content.
-- It is clearly advertising something unrelated to student freelance work.
+DATING
+- Romantic requests.
+- Sugar relationships.
+- Hookups.
+- Companion requests disguised as jobs.
 
-Mark as JOB_OK if:
-- It is a genuine, clearly described freelance or campus job opportunity.
-- The title and description logically match.
-- The task is understandable and realistic.
+SPAM
+- Promotions.
+- Advertisements.
+- Unrelated services.
+- Repetitive marketing.
 
-Allow simple but legitimate service requests (e.g., food preparation, printing, delivery, tutoring) even if written casually, as long as they clearly imply a service being requested.
-However, reject posts that are only personal statements without any indication of hiring or requesting a service.
+Allow casual student wording if it still clearly requests or offers a legitimate service.
 
-Be strict but reasonable.
-Reply ONLY with a JSON object in this exact format:
-{"label":"LABEL_HERE","reason":"Short clear explanation referencing the title-description relationship and why it was classified this way."}
+Reject posts that are simply personal statements without requesting work.
+
+Return ONLY valid JSON.
+
+Example:
+{"label":"JOB_OK","reason":"Short explanation"}
+`;
+
+   const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash",
+  contents: `
+Title: ${title}
+
+Description:
+${text}
 `,
-          },
-          {
-            role: "user",
-            content: `Analyze this post: " The job title is ${title} and the job description is ${text}"`,
-          },
-        ],
-        max_tokens: 100,
-        temperature: 0.1,
+  config: {
+  systemInstruction: SYSTEM_PROMPT,
+  temperature: 0,
+  responseMimeType: "application/json",
+  thinkingConfig: {
+    thinkingBudget: 0,
+  },
+  responseSchema: {
+    type: "OBJECT",
+    properties: {
+      label: {
+        type: "STRING",
+        enum: ["JOB_OK", "SPAM", "SCAM", "DATING"],
       },
-      {
-        headers: {
-          Authorization: `Bearer ${HF_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      }
-    );
+      reason: {
+        type: "STRING",
+      },
+    },
+    required: ["label", "reason"],
+  },
 
-    const aiResponse = response.data.choices[0].message.content;
+},
+});
 
-    // Remove markdown code blocks if present
-    const cleanJson = aiResponse.replace(/```json|```/g, "").trim();
+const result = JSON.parse(response.text);
 
-    return JSON.parse(cleanJson);
+console.log("✅ AI Moderation Result:", result);
+
+return result;
+
+
+;
+
   } catch (err) {
+    console.log(err);
     return { error: "AI_FAILED" };
   }
+
+  
 }
 
 /* =========================
@@ -433,7 +454,7 @@ const checkEscrows = async () => {
           userId: escrow.freelancerId,
           type: "credit",
           amount: escrow.amount,
-          reason: `Auto-release for post ${escrow.postId}`,
+          reason: `Auto-release for post ${escrow.jobpost}`,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
