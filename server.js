@@ -76,6 +76,7 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const FEE_ACCOUNT_RECIPIENT_CODE = process.env.FEE_ACCOUNT_RECIPIENT_CODE;
 const API_KEY = process.env.API_KEY;
 const WITHDRAW_FEE_PERCENT = 7.5;
+const Resend_API_KEY = process.env.RESEND_API_KEY;
 
 const PORT = process.env.PORT || 3000;
 
@@ -624,7 +625,8 @@ const checkEscrows = async () => {
   }
 };
 
-const resend = new Resend("re_TLrYDpqb_42HmCJc45XMkPKbjX1woLmqW");
+
+const resend = new Resend(Resend_API_KEY);
 
 const actionCodeSettings = {
   url: "https://www.step-technologies.com",
