@@ -225,6 +225,112 @@ return result;
   
 }
 
+
+
+
+async function validateLocation(text) {
+  try {
+
+    const SYSTEM_PROMPT = `
+You are a strict but fair location moderator for a university campus freelance marketplace.
+
+Your job is to classify a location as one of the following:
+- LOCATION_OK
+- CHANGE LOCATION
+
+This platform is for students, and jobs are generally expected to take place on or around a university campus.
+
+Evaluate ONLY whether the provided location reasonably sounds like a legitimate place where a student could meet, work, provide a service, or receive a service.
+
+Rules:
+
+LOCATION_OK
+- A location that reasonably sounds like it could exist on a university campus.
+- Campus buildings, hostels, halls, lecture rooms, classrooms, libraries, offices, faculties, departments, cafés, restaurants, shops, student centres, sports facilities, chapels, gates, landmarks, or similar places.
+- Locations identified by a person's name, nickname, abbreviation, business name, or informal student terminology can be valid.
+- Common student expressions such as "around school", "on campus", "at the hostel", "at the library", "at the cafe", or similar wording are valid.
+- Unfamiliar names should still be accepted if they could reasonably be the name of a campus location.
+- Do NOT require the location to be an official or formally recognized campus name.
+- The location does not need to be specific if it clearly refers to a campus environment.
+
+CHANGE LOCATION
+- Clearly nonsensical locations.
+- Clearly fictional or impossible locations.
+- Locations that obviously have nothing to do with a campus or student environment.
+- Clearly private residential locations such as "my house", "my bedroom", "my apartment", "my living room", or similar.
+- Obviously inappropriate or implausible locations such as "in the bush", "in the forest", "middle of nowhere", "under a bridge", or similar.
+- Locations that are clearly jokes, random statements, insults, or meaningless text.
+- Locations that clearly describe a place that would not reasonably be used for a student job or service.
+
+IMPORTANT:
+- There is NO fixed list of valid campus locations.
+- Do not reject a location simply because you do not recognize the name.
+- Do not assume that a person's name, nickname, abbreviation, or unusual word is invalid.
+- When a location is unusual but could reasonably exist on a university campus, classify it as LOCATION_OK.
+- Only classify a location as CHANGE_LOCATION when there is a clear reason to believe it is nonsensical, obviously private, clearly fictional, or clearly unrelated to a campus environment.
+- Be permissive with legitimate student wording.
+
+Return ONLY valid JSON.
+
+Example:
+{"label":"LOCATION_OK","reason":"The location reasonably sounds like a legitimate campus location."}
+
+Example:
+{"label":"CHANGE LOCATION","reason":"The location clearly describes a private residence rather than a campus-related location."}
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+
+      contents: `
+Location:
+${text}
+`,
+
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0,
+        responseMimeType: "application/json",
+
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            label: {
+              type: "STRING",
+              enum: ["LOCATION_OK", "CHANGE LOCATION"],
+            },
+            reason: {
+              type: "STRING",
+            },
+          },
+          required: ["label", "reason"],
+        },
+      },
+    });
+
+    const result = JSON.parse(response.text);
+
+    console.log("✅ Location AI Result:", result);
+
+    return result;
+
+  } catch (err) {
+
+    console.log("❌ Location AI Error:", err);
+
+    return {
+      error: "AI_FAILED"
+    };
+  }
+}
+
+
+
+
 /* =========================
    TEST AI ENDPOINT
 ========================= */
@@ -248,6 +354,58 @@ app.post("/AI", async (req, res) => {
   });
 });
 
+
+
+app.post("/LocationAI", async (req, res) => {
+  console.log("=================================");
+  console.log("📍 LOCATION AI REQUEST RECEIVED");
+  console.log("Body:", req.body);
+  console.log("=================================");
+
+  try {
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      console.log("❌ No location provided");
+
+      return res.status(400).json({
+        error: "NO_LOCATION",
+        message: "No location provided",
+      });
+    }
+
+    console.log("📍 Location being checked:", text);
+
+    const result = await validateLocation(text);
+
+    console.log("📍 Location AI result:", result);
+
+    if (result.error) {
+      console.log("❌ validateLocation returned an error");
+
+      return res.status(500).json({
+        error: "LOCATION_AI_FAILED",
+        message: "Location AI failed",
+      });
+    }
+
+    return res.status(200).json({
+      allowed: result.label === "LOCATION_OK",
+      label: result.label,
+      reason: result.reason,
+    });
+
+  } catch (err) {
+    console.error("❌ /LocationAI CRASHED");
+    console.error("Message:", err.message);
+    console.error("Stack:", err.stack);
+
+    return res.status(500).json({
+      error: "LOCATION_AI_FAILED",
+      message: err.message,
+    });
+  }
+});
 /* =========================
    PAYSTACK HELPER
 ========================= */
@@ -475,43 +633,72 @@ const actionCodeSettings = {
 
 
 app.post("/send-notification", async (req, res) => {
+  try {
+    const { title, body, jobId, schoolDomain } = req.body;
 
-const usersSnapshot = await db.collection("users").get();
+    if (!schoolDomain) {
+      return res.status(400).json({
+        success: false,
+        message: "School domain is required",
+      });
+    }
 
-const tokens = [];
+    const usersSnapshot = await db.collection("users").get();
 
-usersSnapshot.forEach((doc) => {
-  const token = doc.data().expoPushToken;
+    const messages = [];
 
-  if (token) {
-    tokens.push(token);
+    usersSnapshot.forEach((doc) => {
+      const user = doc.data();
+
+      const email = user.email?.toLowerCase().trim();
+      const token = user.expoPushToken;
+
+      // Only notify users from the same school/domain
+      if (
+        email &&
+        token &&
+        email.endsWith(`@${schoolDomain.toLowerCase()}`)
+      ) {
+        messages.push({
+          to: token,
+          sound: "default",
+          title: title,
+          body: body,
+          data: {
+            type: "job",
+            jobId: jobId,
+          },
+        });
+      }
+    });
+
+    console.log(
+      `Sending notification to ${messages.length} users from ${schoolDomain}`
+    );
+
+    const chunks = expo.chunkPushNotifications(messages);
+
+    for (const chunk of chunks) {
+      await expo.sendPushNotificationsAsync(chunk);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Notification sent to ${messages.length} users`,
+      schoolDomain: schoolDomain,
+      recipients: messages.length,
+    });
+
+  } catch (error) {
+    console.error("Notification error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send notification",
+      error: error.message,
+    });
   }
 });
-
-const messages = tokens.map((token) => ({
-  to: token,
-  sound: "default",
-  title: req.body.title,
-  body: req.body.body,
-  data: {
-    "type": "job",
-    jobId: req.body.jobId,
-  },
-}));
-
-
-let chunks = expo.chunkPushNotifications(messages);
-
-for (let chunk of chunks) {
-    await expo.sendPushNotificationsAsync(chunk);
-}
-
- return res.status(200).json({
-      success: true,
-      message: "Notification sent successfully",
-    });
-})
-
 
 
 
