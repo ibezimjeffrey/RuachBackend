@@ -828,6 +828,178 @@ for (let chunk of chunks) {
 
 
 
+app.post("/send-custom-forgetpassword", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email payload is missing" });
+  }
+
+  try {
+    // 1. Request the Password reset link from Firebase Admin securely
+    const verificationLink = await admin
+      .auth()
+      .generatePasswordResetLink(email, actionCodeSettings);
+
+    // 2. Your breathtaking Teal Aesthetic HTML Layout
+    const htmlTemplate = `
+  <div style="background-color: #f4f7f6; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; min-height: 100%;">
+    
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); border: 1px solid #eef2f1;">
+      
+      <!-- Logo -->
+      <tr>
+        <td align="center" style="padding: 40px 40px 20px 40px;">
+          <img 
+            src="https://www.step-technologies.com/static/media/STEP_WHITE.jpeg" 
+            alt="STEP Logo" 
+            style="max-width: 140px; height: auto; display: block;" 
+          />
+        </td>
+      </tr>
+
+      <!-- Divider -->
+      <tr>
+        <td style="padding: 0 40px;">
+          <div style="height: 2px; width: 100%; background: linear-gradient(90deg, rgba(43,158,155,0.1) 0%, rgba(43,158,155,1) 50%, rgba(43,158,155,0.1) 100%);"></div>
+        </td>
+      </tr>
+
+      <!-- Main Message -->
+      <tr>
+        <td style="padding: 40px 40px 30px 40px;">
+          
+          <h2 style="color: #111827; font-size: 24px; font-weight: 700; margin: 0 0 16px 0; text-align: center; letter-spacing: -0.5px;">
+            Forgot your password?
+          </h2>
+
+          <p style="color: #4b5563; font-size: 15px; line-height: 24px; margin: 0; text-align: center;">
+            No worries. We received a request to reset the password for your STEP account. 
+            Click the button below to create a new password and regain access to your account.
+          </p>
+
+        </td>
+      </tr>
+
+      <!-- Reset Button -->
+      <tr>
+        <td align="center" style="padding: 0 40px 40px 40px;">
+          
+          <table border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="border-radius: 8px; background-color: #2B9E9B; box-shadow: 0 4px 12px rgba(43, 158, 155, 0.25);">
+                
+                <a 
+                  href="${verificationLink}" 
+                  target="_blank" 
+                  style="display: inline-block; padding: 14px 36px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px; letter-spacing: 0.3px;"
+                >
+                  Reset My Password
+                </a>
+
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+
+      <!-- Link Fallback -->
+      <tr>
+        <td style="padding: 0 40px 30px 40px;">
+          
+          <p style="color: #9ca3af; font-size: 12px; line-height: 18px; margin: 0; text-align: center;">
+            If the button above doesn't work, copy and paste the link below into your browser's address bar:
+          </p>
+
+          <p style="margin: 8px 0 0 0; text-align: center; word-break: break-all;">
+            <a 
+              href="${verificationLink}" 
+              target="_blank" 
+              style="color: #2B9E9B; font-size: 12px; text-decoration: none;"
+            >
+              ${verificationLink}
+            </a>
+          </p>
+
+        </td>
+      </tr>
+
+      <!-- Security Notice -->
+      <tr>
+        <td style="padding: 0 40px 30px 40px;">
+          
+          <div style="background-color: #f4f7f6; border-radius: 10px; padding: 16px 18px;">
+            
+            <p style="color: #4b5563; font-size: 12px; line-height: 18px; margin: 0; text-align: center;">
+              <strong>Didn't request a password reset?</strong><br>
+              You can safely ignore this email. Your password will remain unchanged.
+            </p>
+
+          </div>
+
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td align="center" style="background-color: #fafbfc; padding: 24px 40px; border-top: 1px solid #f3f4f6;">
+          
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            © 2026 S.T.E.P. Technologies. All rights reserved.
+          </p>
+
+        </td>
+      </tr>
+
+    </table>
+
+    <!-- Disclaimer -->
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px;">
+      <tr>
+        <td align="center" style="padding: 24px 0 0 0;">
+          
+          <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 16px;">
+            You received this email because a password reset was requested for a STEP account associated with this email address.
+          </p>
+
+        </td>
+      </tr>
+    </table>
+
+  </div>
+`;
+
+    // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
+    const response = await resend.emails.send({
+      from: "STEP <noreply@step-technologies.com>",
+      to: [email],
+      subject: "Reset your password for STEP",
+      html: htmlTemplate,
+    });
+
+    if (response.error) {
+      console.error("❌ Resend Delivery Error:", response.error);
+      return res.status(400).json({ error: response.error.message });
+    }
+
+    console.log("🚀 Password Reset Email Sent to", email);
+    return res
+      .status(200)
+      .json({ message: "Password reset link sent successfully!" });
+  } catch (error) {
+    console.error("❌ Firebase Link Generation Fail:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
 
 
 
