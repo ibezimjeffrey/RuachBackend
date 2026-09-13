@@ -828,6 +828,35 @@ for (let chunk of chunks) {
 
 
 
+app.get("/check-bank-details", async (req, res) => {
+  const { account_number, bank_code } = req.query;
+
+  if (!account_number || !bank_code) {
+    return res.status(400).json({ error: "Account number and bank code are required" });
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.paystack.co/bank/resolve?account_number=${account_number}&bank_code=${bank_code}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    res.json(data);
+
+  } catch (error) {
+    res.status(500).json({ error: "Unable to verify account" });
+  }
+});
+
+
+
+
 app.post("/send-custom-forgetpassword", async (req, res) => {
   const { email } = req.body;
 
@@ -972,7 +1001,7 @@ app.post("/send-custom-forgetpassword", async (req, res) => {
 
     // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
     const response = await resend.emails.send({
-      from: "STEP <noreply@step-technologies.com>",
+      from: "STEP <STEP@step-technologies.com>",
       to: [email],
       subject: "Reset your password for STEP",
       html: htmlTemplate,
@@ -992,8 +1021,6 @@ app.post("/send-custom-forgetpassword", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-
-
 
 
 
