@@ -602,18 +602,33 @@ const checkEscrows = async () => {
           Amount: freelancerBalance + escrow.amount,
         });
 
+        
         // Mark escrow as released
         await docSnap.ref.update({
           status: "released",
           isReleased: true,
         });
 
+       
+         await db.collection("Payments").add({
+          _id: escrow._id,
+          post: {
+    _id: escrow.postId // 👈 This ensures post._id exists on the document!
+  },
+          type: "credit",
+          status: true,
+          price: escrow.amount,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+         
+        });
+
+
         // Add to transaction history
         await db.collection("TransactionHistory").add({
           userId: escrow.freelancerId,
           type: "credit",
           amount: escrow.amount,
-          reason: `Auto-release for post ${escrow.jobpost}`,
+          reason: `Auto payment for ${escrow.jobpost}`,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
