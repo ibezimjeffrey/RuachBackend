@@ -529,6 +529,63 @@ app.post("/withdraw", requireApiKey, async (req, res) => {
   }
 });
 
+async function sendEscrowReleasedNotification(freelancerId, escrow) {
+  try {
+    const userDoc = await db
+      .collection("users")
+      .doc(freelancerId)
+      .get();
+
+    if (!userDoc.exists) {
+      console.log("❌ Freelancer user document not found:", freelancerId);
+      return;
+    }
+
+    const token = userDoc.data()?.expoPushToken;
+
+    if (!token) {
+      console.log("⚠️ No Expo push token for freelancer:", freelancerId);
+      return;
+    }
+
+    if (!Expo.isExpoPushToken(token)) {
+      console.log("❌ Invalid Expo push token:", token);
+      return;
+    }
+
+    const amount = Number(escrow.amount || 0);
+
+    const message = {
+      to: token,
+      sound: "default",
+      title: "💰 Payment Released!",
+      body: `₦${amount.toLocaleString("en-NG")} for "${escrow.jobpost}" has been released to your STEP wallet.`,
+      data: {
+        type: "escrow_released",
+        escrowId: escrow._id,
+        postId: escrow.postId,
+      },
+    };
+
+    const chunks = expo.chunkPushNotifications([message]);
+
+    for (const chunk of chunks) {
+      await expo.sendPushNotificationsAsync(chunk);
+    }
+
+    console.log(
+      `🔔 Escrow release notification sent to freelancer ${freelancerId}`
+    );
+
+  } catch (error) {
+    // Notification failure should NOT affect the successful escrow release
+    console.error(
+      "❌ Escrow notification error:",
+      error.message
+    );
+  }
+}
+
 app.post("/charges", requireApiKey, async (req, res) => {
   try {
     const { userId, amount, name } = req.body;
@@ -631,6 +688,12 @@ const checkEscrows = async () => {
           reason: `Auto payment for ${escrow.jobpost}`,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        await sendEscrowReleasedNotification(
+          escrow.freelancerId,
+          escrow
+        );
+
 
         console.log(`✅ Auto-released escrow ${escrow._id}`);
       }
