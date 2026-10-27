@@ -780,7 +780,30 @@ app.post("/send-notification", async (req, res) => {
   }
 });
 
+app.post('/verify-sampul', async (req, res) => {
+    if (req.headers['x-api-key'] !== process.env.SAMPUL_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const { id } = req.body;
 
+    const poster = await db.collection('AllPostings')
+      .where('_id', '==', id).get();
+
+    if (!poster.empty) {
+      return res.json({ verified: true });
+    }
+
+    const tasker = await db.collection('Status')
+      .where('idRoom', '==', id)
+      .where('status', '==', true)
+      .get();
+
+    res.json({ verified: !tasker.empty });
+  } catch {
+    res.status(500).json({ verified: false });
+  }
+});
 
 
 app.post("/send-message-notification", async (req, res) => {
