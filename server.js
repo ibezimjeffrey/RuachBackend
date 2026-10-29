@@ -712,10 +712,21 @@ const actionCodeSettings = {
 };
 
 
-app.post("/send-notification", async (req, res) => {
-  try {
-    const { title, body, jobId, schoolDomain } = req.body;
 
+
+
+app.post("/send-notification", async (req, res) => {
+
+const { title, body, jobId, schoolDomain } = req.body;
+
+
+    const poster_user_id = jobId.split("-")[0];
+    const posterDoc = await db.collection("users").doc(poster_user_id).get();
+    const poster_email = posterDoc.data().email;
+
+
+  try {
+    
     if (!schoolDomain) {
       return res.status(400).json({
         success: false,
@@ -762,44 +773,170 @@ app.post("/send-notification", async (req, res) => {
       await expo.sendPushNotificationsAsync(chunk);
     }
 
-    return res.status(200).json({
-      success: true,
-      message: `Notification sent to ${messages.length} users`,
-      schoolDomain: schoolDomain,
-      recipients: messages.length,
-    });
+    console.log(`🚀 Notification sent to ${messages.length} users from ${schoolDomain}`);
 
   } catch (error) {
     console.error("Notification error:", error);
+  }
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to send notification",
-      error: error.message,
+
+  try {
+
+
+    // 2. Your breathtaking Teal Aesthetic HTML Layout
+   const htmlTemplate = `
+<div style="background-color:#f4f7f6;padding:40px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;min-height:100%;">
+
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:550px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #eef2f1;">
+
+    <!-- Logo -->
+    <tr>
+      <td align="center" style="padding:40px 40px 20px;">
+        <img
+          src="https://www.step-technologies.com/static/media/STEP_WHITE.jpeg"
+          alt="STEP Logo"
+          style="max-width:140px;height:auto;display:block;"
+        />
+      </td>
+    </tr>
+
+    <!-- Divider -->
+    <tr>
+      <td style="padding:0 40px;">
+        <div style="height:2px;width:100%;background:linear-gradient(90deg,rgba(43,158,155,0.1) 0%,rgba(43,158,155,1) 50%,rgba(43,158,155,0.1) 100%);"></div>
+      </td>
+    </tr>
+
+    <!-- Main Message -->
+    <tr>
+      <td style="padding:40px 40px 20px;">
+        <h2 style="color:#111827;font-size:26px;font-weight:700;margin:0 0 16px;text-align:center;">
+          Your Job Is Live! 🎉
+        </h2>
+
+        <p style="color:#4b5563;font-size:15px;line-height:25px;margin:0;text-align:center;">
+          Great news! Your job has been successfully posted on STEP. Students can now discover your task and submit proposals. We look forward to helping you find the right person for the job!
+        </p>
+      </td>
+    </tr>
+
+    <!-- Job ID -->
+    <tr>
+      <td style="padding:10px 40px 30px;">
+        <div style="background-color:#f0f9f8;border:1px solid #cce9e7;border-radius:12px;padding:24px 16px;text-align:center;">
+          <p style="color:#4b5563;font-size:13px;margin:0 0 12px;">
+            YOUR JOB ID
+          </p>
+
+          <p style="color:#167f7c;font-size:17px;font-weight:700;line-height:26px;margin:0;word-break:break-all;">
+            ${jobId}
+          </p>
+
+          <p style="color:#6b7280;font-size:12px;line-height:19px;margin:14px 0 0;">
+            Keep this ID safe, as you may need it to resolve any issues that arise while the task is being completed.
+          </p>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Closing Message -->
+    <tr>
+      <td style="padding:0 40px 35px;">
+        <p style="color:#4b5563;font-size:14px;line-height:24px;margin:0;text-align:center;">
+          Thank you for choosing STEP. We wish you a smooth hiring process and a successful outcome!
+        </p>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td align="center" style="background-color:#fafbfc;padding:24px 40px;border-top:1px solid #f3f4f6;">
+        <p style="color:#9ca3af;font-size:12px;margin:0;">
+          © 2026 S.T.E.P. Technologies. All rights reserved.
+        </p>
+      </td>
+    </tr>
+
+  </table>
+
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:550px;">
+    <tr>
+      <td align="center" style="padding:24px 0 0;">
+        <p style="color:#9ca3af;font-size:11px;line-height:16px;margin:0;text-align:center;">
+          You received this email because you posted a job on STEP.
+        </p>
+      </td>
+    </tr>
+  </table>
+
+</div>
+`;
+
+    // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
+    const response = await resend.emails.send({
+      from: "STEP <STEP@step-technologies.com>",
+      to: [poster_email],
+      subject: "Your Job Has Been Posted on STEP!",
+      html: htmlTemplate,
     });
+
+    if (response.error) {
+      console.error("❌ Resend Delivery Error:", response.error);
+      return res.status(400).json({ error: response.error.message });
+    }
+
+    console.log("🚀 Hiring Notification Email Sent to ", poster_email);
+    return res
+      .status(200)
+      .json({ message: "Hiring notification sent successfully!" });
+  } catch (error) {
+    console.error("Hiring Notification Error:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
+
+
+
 
 app.post('/verify-sampul', async (req, res) => {
     if (req.headers['x-api-key'] !== process.env.SAMPUL_API_KEY) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    const { id } = req.body;
+    const { id,email,role } = req.body;
 
-    const poster = await db.collection('AllPostings')
-      .where('_id', '==', id).get();
+if (role === 'poster') {
+
+const poster = await db.collection('AllPostings')
+      .where('_id', '==', id).where('User.email', '==', email).get();
 
     if (!poster.empty) {
       return res.json({ verified: true });
     }
+    else {
+      return res.json({ verified: false });
+    }
 
-    const tasker = await db.collection('Status')
-      .where('idRoom', '==', id)
+}
+    else if (role === 'tasker') {
+ const tasker = await db.collection('Status')
+      .where('post.idRoom', '==', id)
       .where('status', '==', true)
+      .where('receipient.email', '==', email)
       .get();
 
-    res.json({ verified: !tasker.empty });
+    if (!tasker.empty) {
+      return res.json({ verified: true });
+    }
+    else {
+      return res.json({ verified: false });
+    }
+} 
+    else {
+  return res.status(400).json({
+    error: 'Invalid role'
+  });
+}
   } catch {
     res.status(500).json({ verified: false });
   }
@@ -854,15 +991,20 @@ for (let chunk of chunks) {
 
   app.post("/send-hired-notification", async (req, res) => {
 
+
   const userDoc = await db
     .collection("users")
     .doc(req.body.receiverId)
     .get();
 
   const token = userDoc.data().expoPushToken;
+  const email = userDoc.data().email;
+  
 
 
-  const messages = [
+  try {
+    
+    const messages = [
     {
       to: token,
       sound: "default",
@@ -881,12 +1023,134 @@ for (let chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
   }
 
- return res.status(200).json({
-      success: true,
-      message: "Notification sent successfully",
+    }
+
+
+  catch (error) {
+    console.error("Notification error:", error);
+   
+  }
+
+  
+
+ try {
+
+
+    // 2. Your breathtaking Teal Aesthetic HTML Layout
+    const htmlTemplate = `
+<div style="background-color:#f4f7f6;padding:40px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;min-height:100%;">
+
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:550px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #eef2f1;">
+
+    <!-- Logo -->
+    <tr>
+      <td align="center" style="padding:40px 40px 20px;">
+        <img
+          src="https://www.step-technologies.com/static/media/STEP_WHITE.jpeg"
+          alt="STEP Logo"
+          style="max-width:140px;height:auto;display:block;"
+        />
+      </td>
+    </tr>
+
+    <!-- Divider -->
+    <tr>
+      <td style="padding:0 40px;">
+        <div style="height:2px;width:100%;background:linear-gradient(90deg,rgba(43,158,155,0.1) 0%,rgba(43,158,155,1) 50%,rgba(43,158,155,0.1) 100%);"></div>
+      </td>
+    </tr>
+
+    <!-- Main Message -->
+    <tr>
+      <td style="padding:40px 40px 20px;">
+        <h2 style="color:#111827;font-size:26px;font-weight:700;margin:0 0 16px;text-align:center;">
+          Congratulations! 🎉
+        </h2>
+
+        <p style="color:#4b5563;font-size:15px;line-height:25px;margin:0;text-align:center;">
+          Great news! You've been hired for a task on STEP. We're excited for you and wish you success as you get started.
+        </p>
+      </td>
+    </tr>
+
+    <!-- Hiring ID -->
+    <tr>
+      <td style="padding:10px 40px 30px;">
+        <div style="background-color:#f0f9f8;border:1px solid #cce9e7;border-radius:12px;padding:24px 16px;text-align:center;">
+          <p style="color:#4b5563;font-size:13px;margin:0 0 12px;">
+            YOUR HIRING ID
+          </p>
+
+          <p style="color:#167f7c;font-size:17px;font-weight:700;line-height:26px;margin:0;word-break:break-all;">
+            ${req.body.roomId}
+          </p>
+
+          <p style="color:#6b7280;font-size:12px;line-height:19px;margin:14px 0 0;">
+          Keep this ID safe, as you may need it to file a dispute if any issues arise while completing the job.
+          </p>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Closing Message -->
+    <tr>
+      <td style="padding:0 40px 35px;">
+        <p style="color:#4b5563;font-size:14px;line-height:24px;margin:0;text-align:center;">
+          Thank you for being part of STEP. Keep up the great work, and congratulations once again!
+        </p>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td align="center" style="background-color:#fafbfc;padding:24px 40px;border-top:1px solid #f3f4f6;">
+        <p style="color:#9ca3af;font-size:12px;margin:0;">
+          © 2026 S.T.E.P. Technologies. All rights reserved.
+        </p>
+      </td>
+    </tr>
+
+  </table>
+
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:550px;">
+    <tr>
+      <td align="center" style="padding:24px 0 0;">
+        <p style="color:#9ca3af;font-size:11px;line-height:16px;margin:0;text-align:center;">
+          You received this email because you were hired for a task on STEP.
+        </p>
+      </td>
+    </tr>
+  </table>
+
+</div>
+`;
+
+    // 3. Fire the request over Port 443 (HTTPS Web Traffic - Never blocked by Render)
+    const response = await resend.emails.send({
+      from: "STEP <STEP@step-technologies.com>",
+      to: [email],
+      subject: "Congratulations! You've Been Hired on STEP.",
+      html: htmlTemplate,
     });
 
-  });
+    if (response.error) {
+      console.error("❌ Resend Delivery Error:", response.error);
+      return res.status(400).json({ error: response.error.message });
+    }
+
+    console.log("🚀 Hiring Notification Email Sent to ", email);
+    return res
+      .status(200)
+      .json({ message: "Hiring notification sent successfully!" });
+  } catch (error) {
+    console.error("Hiring Notification Error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  }
+  
+
+  );
 
 
 
